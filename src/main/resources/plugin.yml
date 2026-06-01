@@ -1,0 +1,24 @@
+name: Duel1v1
+version: 1.0.0
+main: me.hendi.duel1v1.Duel1v1
+api-version: '1.21'
+author: Hendi
+description: Plugin simples para duelos 1v1
+
+commands:
+  duelo:
+    description: Gerencia duelos 1v1
+    usage: /<command> <jogador> | aceitar <jogador> | recusar <jogador> | sair | cancelar
+    aliases: [duel]
+  duelonpc:
+    description: Cria um NPC clicável para entrar na fila de duelos
+    usage: /<command>
+    permission: duel.admin
+
+permissions:
+  duel.use:
+    description: Permite usar comandos de duelo
+    default: true
+  duel.admin:
+    description: Permite gerenciar arenas
+    default: op

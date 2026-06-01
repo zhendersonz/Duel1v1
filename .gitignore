@@ -1,0 +1,6 @@
+target/
+*.class
+*.jar
+!.gitignore
+.DS_Store
+*.log

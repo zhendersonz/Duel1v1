@@ -1,0 +1,37 @@
+# Configuração do Duel1v1
+
+# Tempo em segundos para aceitar um desafio
+challenge-timeout: 60
+
+# Kit padrão (ID do item : quantidade)
+# Use "default" para usar o inventário do jogador
+kit:
+  items:
+    - DIAMOND_SWORD:1
+    - BOW:1
+    - ARROW:16
+    - GOLDEN_APPLE:8
+    - COOKED_BEEF:16
+  armor:
+    - DIAMOND_HELMET
+    - DIAMOND_CHESTPLATE
+    - DIAMOND_LEGGINGS
+    - DIAMOND_BOOTS
+
+# Arena padrão - configure com /duel setpos
+arena:
+  pos1:
+    world: world
+    x: 0
+    y: 100
+    z: 10
+  pos2:
+    world: world
+    x: 0
+    y: 100
+    z: -10
+  lobby:
+    world: world
+    x: 0
+    y: 100
+    z: 0
