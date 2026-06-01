@@ -300,14 +300,14 @@ public class DuelManager {
             }
             return;
         }
+        PlayerState state = this.savedStates.remove(player.getUniqueId());
+        if (state != null) {
+            this.pendingStates.put(player.getUniqueId(), state);
+        }
         this.inMatch.remove(player.getUniqueId());
-        this.savedStates.remove(player.getUniqueId());
         this.savedLevel.remove(player.getUniqueId());
         this.savedExp.remove(player.getUniqueId());
         this.matchKills.remove(player.getUniqueId());
-        Location loc = this.targetLocation(player);
-        player.teleport(loc);
-        player.sendMessage("\u00a7cVoc\u00ea saiu da partida.");
     }
 
     public void handleDeath(Player player) {
@@ -530,6 +530,14 @@ public class DuelManager {
         player.setFlying(state.flying() && state.allowFlight());
         for (PotionEffect effect : player.getActivePotionEffects()) {
             player.removePotionEffect(effect.getType());
+        }
+    }
+
+    public void restoreOnRejoin(Player player) {
+        PlayerState state = this.pendingStates.remove(player.getUniqueId());
+        if (state != null) {
+            this.applyRestore(player, state);
+            player.sendMessage("\u00a7aSeus itens foram restaurados ap\u00f3s desconectar durante um duelo.");
         }
     }
 

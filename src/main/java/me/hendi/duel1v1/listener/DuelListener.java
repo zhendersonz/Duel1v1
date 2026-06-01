@@ -32,8 +32,9 @@ implements Listener {
     }
 
     @EventHandler
-    public void onFirstOpJoin(PlayerJoinEvent event) {
+    public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        this.duelManager.restoreOnRejoin(player);
         if (!player.isOp()) {
             return;
         }
