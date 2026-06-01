@@ -275,7 +275,6 @@ public class DuelManager {
         this.matchKills.remove(winner.getUniqueId());
         this.playerPositions.remove(loser.getUniqueId());
         this.playerPositions.remove(winner.getUniqueId());
-        this.deadInMatch.remove(loser.getUniqueId());
         this.deadInMatch.remove(winner.getUniqueId());
         this.savedLevel.remove(loser.getUniqueId());
         this.savedLevel.remove(winner.getUniqueId());
@@ -287,6 +286,8 @@ public class DuelManager {
         }
         if ((loserState = this.savedStates.remove(loser.getUniqueId())) != null) {
             this.pendingStates.put(loser.getUniqueId(), loserState);
+            loser.getInventory().clear();
+            loser.getInventory().setArmorContents(null);
         }
         Location target = this.targetLocation(winner);
         Bukkit.broadcastMessage((String)("\u00a76\u00a7lVIT\u00d3RIA! \u00a7a" + winner.getName() + " \u00a77venceu \u00a7e" + loser.getName() + " \u00a77(" + wins + "-" + deaths + ")"));
@@ -316,6 +317,8 @@ public class DuelManager {
         PlayerState state = this.savedStates.remove(player.getUniqueId());
         if (state != null) {
             this.pendingStates.put(player.getUniqueId(), state);
+            player.getInventory().clear();
+            player.getInventory().setArmorContents(null);
         }
         this.inMatch.remove(player.getUniqueId());
         this.deadInMatch.remove(player.getUniqueId());
@@ -402,12 +405,9 @@ public class DuelManager {
             PlayerState pending = this.pendingStates.remove(player.getUniqueId());
             if (pending != null) {
                 Location loc = this.targetLocation(player);
+                this.applyRestore(player, pending);
+                player.teleport(loc);
                 event.setRespawnLocation(loc);
-                PlayerState fp = pending;
-                Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
-                    this.applyRestore(player, fp);
-                    player.teleport(loc);
-                });
                 return;
             }
         } else if (this.savedStates.containsKey(player.getUniqueId())) {
