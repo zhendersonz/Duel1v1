@@ -66,4 +66,3 @@ extends JavaPlugin {
         return this.hologramManager;
     }
 }
-

@@ -6,7 +6,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
@@ -31,7 +30,7 @@ public class StatsManager {
                 e.printStackTrace();
             }
         }
-        this.stats = (FileConfiguration)YamlConfiguration.loadConfiguration(this.statsFile);
+        this.stats = YamlConfiguration.loadConfiguration(this.statsFile);
     }
 
     public void save() {
@@ -43,33 +42,33 @@ public class StatsManager {
     }
 
     public void addKill(UUID uuid) {
-        String path = String.valueOf(uuid.toString()) + ".kills";
-        this.stats.set(path, (Object)(this.stats.getInt(path) + 1));
+        String path = uuid.toString() + ".kills";
+        this.stats.set(path, this.stats.getInt(path) + 1);
         this.save();
     }
 
     public void addDeath(UUID uuid) {
-        String path = String.valueOf(uuid.toString()) + ".deaths";
-        this.stats.set(path, (Object)(this.stats.getInt(path) + 1));
+        String path = uuid.toString() + ".deaths";
+        this.stats.set(path, this.stats.getInt(path) + 1);
         this.save();
     }
 
     public void addBattle(UUID uuid) {
-        String path = String.valueOf(uuid.toString()) + ".battles";
-        this.stats.set(path, (Object)(this.stats.getInt(path) + 1));
+        String path = uuid.toString() + ".battles";
+        this.stats.set(path, this.stats.getInt(path) + 1);
         this.save();
     }
 
     public int getKills(UUID uuid) {
-        return this.stats.getInt(String.valueOf(uuid.toString()) + ".kills");
+        return this.stats.getInt(uuid.toString() + ".kills");
     }
 
     public int getDeaths(UUID uuid) {
-        return this.stats.getInt(String.valueOf(uuid.toString()) + ".deaths");
+        return this.stats.getInt(uuid.toString() + ".deaths");
     }
 
     public int getBattles(UUID uuid) {
-        return this.stats.getInt(String.valueOf(uuid.toString()) + ".battles");
+        return this.stats.getInt(uuid.toString() + ".battles");
     }
 
     public double getKD(UUID uuid) {
@@ -77,7 +76,7 @@ public class StatsManager {
         if (deaths == 0) {
             return this.getKills(uuid);
         }
-        return (double)this.getKills(uuid) / (double)deaths;
+        return (double) this.getKills(uuid) / (double) deaths;
     }
 
     public void reset(UUID uuid) {
@@ -85,45 +84,24 @@ public class StatsManager {
         this.save();
     }
 
-    public List<UUID> getTopKills(int limit) {
-        return this.stats.getKeys(false).stream().map(s -> {
-            try {
-                return UUID.fromString(s);
-            } catch (Exception e) {
-                return null;
-            }
-        }).filter(u -> u != null).sorted((a, b) -> Integer.compare(this.getKills(b), this.getKills(a))).limit(limit).collect(Collectors.toList());
-    }
-
-    public List<UUID> getTopDeaths(int limit) {
-        return this.stats.getKeys(false).stream().map(s -> {
-            try {
-                return UUID.fromString(s);
-            } catch (Exception e) {
-                return null;
-            }
-        }).filter(u -> u != null).sorted((a, b) -> Integer.compare(this.getDeaths(b), this.getDeaths(a))).limit(limit).collect(Collectors.toList());
-    }
-
-    public List<UUID> getTopBattles(int limit) {
-        return this.stats.getKeys(false).stream().map(s -> {
-            try {
-                return UUID.fromString(s);
-            } catch (Exception e) {
-                return null;
-            }
-        }).filter(u -> u != null).sorted((a, b) -> Integer.compare(this.getBattles(b), this.getBattles(a))).limit(limit).collect(Collectors.toList());
-    }
-
-    public String getStatsMessage(UUID uuid) {
-        String name = Bukkit.getOfflinePlayer(uuid).getName();
-        if (name == null) {
-            name = uuid.toString().substring(0, 8);
-        }
-        int kills = this.getKills(uuid);
-        int deaths = this.getDeaths(uuid);
-        int battles = this.getBattles(uuid);
-        double kd = this.getKD(uuid);
-        return String.format("\u00a76%s \u00a77- \u00a7fKills: \u00a7a%d \u00a77| \u00a7fMortes: \u00a7c%d \u00a77| \u00a7fBatalhas: \u00a7e%d \u00a77| \u00a7fK/D: \u00a7b%.2f", name, kills, deaths, battles, kd);
+    public List<UUID> getTopPlayers(int limit) {
+        return this.stats.getKeys(false).stream()
+            .map(s -> {
+                try {
+                    return UUID.fromString(s);
+                } catch (Exception e) {
+                    return null;
+                }
+            })
+            .filter(u -> u != null)
+            .sorted((a, b) -> {
+                double kdA = this.getKD(a);
+                double kdB = this.getKD(b);
+                int cmp = Double.compare(kdB, kdA);
+                if (cmp != 0) return cmp;
+                return Integer.compare(this.getKills(b), this.getKills(a));
+            })
+            .limit(limit)
+            .collect(Collectors.toList());
     }
 }

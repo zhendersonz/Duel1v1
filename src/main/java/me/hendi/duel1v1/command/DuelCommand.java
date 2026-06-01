@@ -1,10 +1,10 @@
 package me.hendi.duel1v1.command;
 
+import java.util.UUID;
 import me.hendi.duel1v1.Duel1v1;
 import me.hendi.duel1v1.manager.DuelManager;
 import me.hendi.duel1v1.stats.HologramManager;
 import me.hendi.duel1v1.stats.StatsManager;
-import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -36,17 +36,17 @@ implements CommandExecutor {
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "accept": 
+            case "accept":
             case "aceitar": {
                 this.handleAccept(player, args);
                 break;
             }
-            case "deny": 
+            case "deny":
             case "recusar": {
                 this.handleDeny(player, args);
                 break;
             }
-            case "leave": 
+            case "leave":
             case "sair": {
                 this.duelManager.leaveMatch(player);
                 break;
@@ -229,4 +229,3 @@ implements CommandExecutor {
         }
     }
 }
-

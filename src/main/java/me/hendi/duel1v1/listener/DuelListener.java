@@ -12,6 +12,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -135,8 +136,26 @@ implements Listener {
     }
 
     @EventHandler
-    public void onEntityDamage(EntityDamageByEntityEvent event) {
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (this.duelManager.isNpc(event.getEntity())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         Entity entity = event.getEntity();
+        if (this.duelManager.isNpc(entity)) {
+            event.setCancelled(true);
+            if (event.getDamager() instanceof Player) {
+                Player player = (Player) event.getDamager();
+                String err = this.duelManager.joinQueue(player);
+                if (err != null) {
+                    player.sendMessage(err);
+                }
+            }
+            return;
+        }
         if (!(entity instanceof Player)) {
             return;
         }

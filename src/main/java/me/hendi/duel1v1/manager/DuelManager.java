@@ -857,11 +857,6 @@ public class DuelManager {
         return this.pos1 != null && this.pos2 != null && this.lobby != null;
     }
 
-    public StatsManager getStatsManager() {
-        return this.statsManager;
-    }
-
     private record PlayerState(ItemStack[] inventory, ItemStack[] armor, Location location, GameMode gameMode, double health, int foodLevel, int level, float exp, float walkSpeed, float flySpeed, boolean allowFlight, boolean flying) {
     }
 }
-
