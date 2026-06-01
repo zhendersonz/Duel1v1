@@ -69,6 +69,10 @@ implements CommandExecutor {
                 this.handleHolograma(player, args);
                 break;
             }
+            case "resetar": {
+                this.handleResetPlayer(player, args);
+                break;
+            }
             default: {
                 this.handleChallenge(player, args);
             }
@@ -214,6 +218,30 @@ implements CommandExecutor {
         }
     }
 
+    private void handleResetPlayer(Player player, String[] args) {
+        Player target = player;
+        if (args.length >= 2) {
+            target = Bukkit.getPlayer(args[1]);
+            if (target == null) {
+                player.sendMessage("\u00a7cJogador n\u00e3o encontrado!");
+                return;
+            }
+            if (!player.hasPermission("duel.admin")) {
+                player.sendMessage("\u00a7cSem permiss\u00e3o para resetar outros jogadores!");
+                return;
+            }
+        }
+        target.setWalkSpeed(0.2f);
+        target.setFlySpeed(0.1f);
+        target.setAllowFlight(false);
+        target.setFlying(false);
+        target.setGameMode(org.bukkit.GameMode.SURVIVAL);
+        target.sendMessage("\u00a7aSeu estado foi resetado!");
+        if (!player.equals(target)) {
+            player.sendMessage("\u00a7aEstado de " + target.getName() + " resetado!");
+        }
+    }
+
     private void sendHelp(Player player) {
         player.sendMessage("\u00a76\u00a7l=== DUELO 1v1 ===");
         player.sendMessage("\u00a7e/duelo <jogador> \u00a77- Desafiar jogador");
@@ -226,6 +254,8 @@ implements CommandExecutor {
             player.sendMessage("\u00a7e/duelo setpos <pos1|pos2|lobby> \u00a77- Definir posi\u00e7\u00f5es da arena");
             player.sendMessage("\u00a7e/duelo holograma criar|remover|atualizar \u00a77- Gerenciar holograma");
             player.sendMessage("\u00a7e/duelo stats resetar <jogador> \u00a77- Resetar estat\u00edsticas");
+            player.sendMessage("\u00a7e/duelo resetar [jogador] \u00a77- Resetar estado do jogador (travaram)");
         }
+        player.sendMessage("\u00a7e/duelo resetar \u00a77- Resetar seu estado (se ficou travado)");
     }
 }

@@ -275,6 +275,12 @@ public class DuelManager {
         this.matchKills.remove(winner.getUniqueId());
         this.playerPositions.remove(loser.getUniqueId());
         this.playerPositions.remove(winner.getUniqueId());
+        this.deadInMatch.remove(loser.getUniqueId());
+        this.deadInMatch.remove(winner.getUniqueId());
+        this.savedLevel.remove(loser.getUniqueId());
+        this.savedLevel.remove(winner.getUniqueId());
+        this.savedExp.remove(loser.getUniqueId());
+        this.savedExp.remove(winner.getUniqueId());
         PlayerState winnerState = this.savedStates.remove(winner.getUniqueId());
         if (winnerState != null) {
             this.applyRestore(winner, winnerState);
@@ -312,6 +318,7 @@ public class DuelManager {
             this.pendingStates.put(player.getUniqueId(), state);
         }
         this.inMatch.remove(player.getUniqueId());
+        this.deadInMatch.remove(player.getUniqueId());
         this.savedLevel.remove(player.getUniqueId());
         this.savedExp.remove(player.getUniqueId());
         this.matchKills.remove(player.getUniqueId());
@@ -406,21 +413,29 @@ public class DuelManager {
         } else if (this.savedStates.containsKey(player.getUniqueId())) {
             this.restoreState(player);
         }
-        int level = this.savedLevel.getOrDefault(player.getUniqueId(), 0);
-        float exp = this.savedExp.getOrDefault(player.getUniqueId(), Float.valueOf(0.0f)).floatValue();
+        this.deadInMatch.remove(player.getUniqueId());
         this.savedLevel.remove(player.getUniqueId());
         this.savedExp.remove(player.getUniqueId());
+        this.activeFreezeTasks.remove(player.getUniqueId());
         Location loc = this.targetLocation(player);
         event.setRespawnLocation(loc);
         Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
-            player.setLevel(level);
-            player.setExp(exp);
+            player.setLevel(0);
+            player.setExp(0.0f);
             player.setGameMode(GameMode.SURVIVAL);
+            player.setWalkSpeed(0.2f);
+            player.setFlySpeed(0.1f);
+            player.setAllowFlight(false);
+            player.setFlying(false);
             player.teleport(loc);
         });
     }
 
     public void handleQuit(Player player) {
+        this.deadInMatch.remove(player.getUniqueId());
+        this.savedLevel.remove(player.getUniqueId());
+        this.savedExp.remove(player.getUniqueId());
+        this.cancelActiveFreeze(player);
         if (!this.inMatch.contains(player.getUniqueId())) {
             return;
         }
@@ -464,9 +479,11 @@ public class DuelManager {
         if (taskId != null) {
             Bukkit.getScheduler().cancelTask(taskId.intValue());
         }
-        player.setWalkSpeed(0.2f);
-        player.setFlySpeed(0.1f);
-        player.setFlying(false);
+        if (player.isOnline()) {
+            player.setWalkSpeed(0.2f);
+            player.setFlySpeed(0.1f);
+            player.setFlying(false);
+        }
     }
 
     private void refreshEntity(Player player, Location target) {
@@ -543,6 +560,10 @@ public class DuelManager {
     }
 
     public void restoreOnRejoin(Player player) {
+        this.deadInMatch.remove(player.getUniqueId());
+        this.savedLevel.remove(player.getUniqueId());
+        this.savedExp.remove(player.getUniqueId());
+        this.activeFreezeTasks.remove(player.getUniqueId());
         PlayerState state = this.pendingStates.remove(player.getUniqueId());
         if (state != null) {
             this.applyRestore(player, state);
