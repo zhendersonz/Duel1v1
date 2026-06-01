@@ -26,10 +26,13 @@ kit:
     - DIAMOND_SWORD
     - BOW
     - ARROW:32
+    - GOLDEN_APPLE:10
+    - ENCHANTED_GOLDEN_APPLE
   armor:
     - DIAMOND_HELMET
     - DIAMOND_CHESTPLATE
     - DIAMOND_LEGGINGS
     - DIAMOND_BOOTS
+  offhand: SHIELD
 
 challenge-timeout: 60

@@ -641,6 +641,10 @@ public class DuelManager {
             }
             ++slot;
         }
+        String offhand = this.plugin.getConfig().getString("kit.offhand");
+        if (offhand != null && Material.getMaterial(offhand.toUpperCase()) != null) {
+            inv.setItemInOffHand(new ItemStack(Material.getMaterial(offhand.toUpperCase())));
+        }
     }
 
     public void cleanup() {
