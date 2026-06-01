@@ -1,11 +1,9 @@
 package me.hendi.duel1v1.manager;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
@@ -56,7 +54,6 @@ public class DuelManager {
     private final Map<UUID, Location> playerOrigins = new HashMap<UUID, Location>();
     private final Map<UUID, Integer> activeFreezeTasks = new HashMap<UUID, Integer>();
     private final Map<UUID, Integer> queueTimeoutTasks = new HashMap<UUID, Integer>();
-    private final List<Integer> countdownTasks = new ArrayList<Integer>();
     private static final int KILL_LIMIT = 2;
     private static final long QUEUE_TIMEOUT_TICKS = 1200L;
     private static final NamespacedKey NPC_KEY;
@@ -234,8 +231,6 @@ public class DuelManager {
         this.matchKills.put(p2.getUniqueId(), 0);
         this.playerPositions.put(p1.getUniqueId(), this.pos1);
         this.playerPositions.put(p2.getUniqueId(), this.pos2);
-        this.playerOrigins.put(p1.getUniqueId(), p1.getLocation().clone());
-        this.playerOrigins.put(p2.getUniqueId(), p2.getLocation().clone());
         this.statsManager.addBattle(p1.getUniqueId());
         this.statsManager.addBattle(p2.getUniqueId());
         int freezeTask = this.startFreeze(p1, p2, p1.getLocation(), p2.getLocation());
@@ -243,13 +238,12 @@ public class DuelManager {
         p2.sendTitle("\u00a76\u00a7lDUELO!", "\u00a7eQue ven\u00e7a o melhor!", 0, 40, 10);
         for (int i = 5; i >= 1; --i) {
             int count = i;
-            int taskId = Bukkit.getScheduler().scheduleSyncDelayedTask((Plugin)this.plugin, () -> {
+            Bukkit.getScheduler().runTaskLater((Plugin)this.plugin, () -> {
                 p1.sendTitle("\u00a76\u00a7l" + count, "", 0, 15, 5);
                 p2.sendTitle("\u00a76\u00a7l" + count, "", 0, 15, 5);
             }, (long)(5 - i) * 20L);
-            this.countdownTasks.add(taskId);
         }
-        int mainTaskId = Bukkit.getScheduler().scheduleSyncDelayedTask((Plugin)this.plugin, () -> {
+        Bukkit.getScheduler().runTaskLater((Plugin)this.plugin, () -> {
             this.stopFreeze(freezeTask, p1, p2);
             if (!this.inMatch.contains(p1.getUniqueId()) || !this.inMatch.contains(p2.getUniqueId())) {
                 return;
@@ -268,16 +262,16 @@ public class DuelManager {
             this.refreshEntity(p1, this.pos1);
             this.refreshEntity(p2, this.pos2);
         }, 100L);
-        this.countdownTasks.add(mainTaskId);
     }
 
     public void endMatch(Player loser, Player winner) {
         if (!this.inMatch.contains(loser.getUniqueId()) || !this.inMatch.contains(winner.getUniqueId())) {
             return;
         }
-        UUID winnerUUID = winner.getUniqueId();
         UUID loserUUID = loser.getUniqueId();
+        UUID winnerUUID = winner.getUniqueId();
         
+        PlayerState loserState;
         this.cancelActiveFreeze(loser);
         this.cancelActiveFreeze(winner);
         int wins = this.matchKills.getOrDefault(winnerUUID, 0);
@@ -286,48 +280,39 @@ public class DuelManager {
         // Remove from active match
         this.inMatch.remove(loserUUID);
         this.inMatch.remove(winnerUUID);
-        this.deadInMatch.remove(winnerUUID);
-        this.deadInMatch.remove(loserUUID);
-        
-        // Complete cleanup - remove all player-related data
+        this.deadInMatch.remove(winner.getUniqueId());
         this.matchKills.remove(loserUUID);
         this.matchKills.remove(winnerUUID);
         this.playerPositions.remove(loserUUID);
         this.playerPositions.remove(winnerUUID);
-        this.playerOrigins.remove(loserUUID);
-        this.playerOrigins.remove(winnerUUID);
         this.savedLevel.remove(loserUUID);
         this.savedLevel.remove(winnerUUID);
         this.savedExp.remove(loserUUID);
         this.savedExp.remove(winnerUUID);
-        this.challenges.remove(winnerUUID);
-        this.challenges.remove(loserUUID);
-        this.challengeTime.remove(winnerUUID);
-        this.challengeTime.remove(loserUUID);
-        this.denyCooldown.remove(winnerUUID);
-        this.denyCooldown.remove(loserUUID);
         
-        // Restore states
         PlayerState winnerState = this.savedStates.remove(winnerUUID);
         if (winnerState != null) {
             this.applyRestore(winner, winnerState);
         }
-        
-        PlayerState loserState = this.savedStates.remove(loserUUID);
-        if (loserState != null) {
+        if ((loserState = this.savedStates.remove(loserUUID)) != null) {
             this.pendingStates.put(loserUUID, loserState);
             loser.getInventory().clear();
             loser.getInventory().setArmorContents(null);
         }
         
-        Location winnerOrigin = this.playerOrigins.get(winnerUUID);
-        Location loserOrigin = this.playerOrigins.get(loserUUID);
+        // Get original locations for both players
+        Location winnerOrigin = this.playerOrigins.remove(winnerUUID);
+        Location loserOrigin = this.playerOrigins.remove(loserUUID);
+        
+        // If original location exists, use it; otherwise use targetLocation as fallback
         Location winnerTarget = winnerOrigin != null ? winnerOrigin : this.targetLocation(winner);
         Location loserTarget = loserOrigin != null ? loserOrigin : this.targetLocation(loser);
         
         Bukkit.broadcastMessage((String)("\u00a76\u00a7lVIT\u00d3RIA! \u00a7a" + winner.getName() + " \u00a77venceu \u00a7e" + loser.getName() + " \u00a77(" + wins + "-" + deaths + ")"));
         this.spawnFireworks(winner);
+        
         Bukkit.getScheduler().runTaskLater((Plugin)this.plugin, () -> {
+            // Teleport each player to their original location
             winner.teleport(winnerTarget);
             loser.teleport(loserTarget);
         }, 60L);
@@ -338,32 +323,28 @@ public class DuelManager {
             player.sendMessage("\u00a7cVoc\u00ea n\u00e3o est\u00e1 em uma partida!");
             return;
         }
-        UUID playerUUID = player.getUniqueId();
-        Player opponent = this.findOpponent(player);
-        
-        if (opponent != null && this.inMatch.contains(opponent.getUniqueId())) {
-            this.matchKills.put(opponent.getUniqueId(), this.matchKills.getOrDefault(opponent.getUniqueId(), 0) + 1);
-            this.statsManager.addKill(opponent.getUniqueId());
-            this.statsManager.addDeath(playerUUID);
-            this.endMatch(player, opponent);
+        for (Map.Entry<UUID, PlayerState> entry : this.savedStates.entrySet()) {
+            if (!this.inMatch.contains(entry.getKey()) || entry.getKey().equals(player.getUniqueId())) continue;
+            Player opponent = Bukkit.getPlayer((UUID)entry.getKey());
+            if (opponent != null) {
+                this.matchKills.put(opponent.getUniqueId(), this.matchKills.getOrDefault(opponent.getUniqueId(), 0) + 1);
+                this.statsManager.addKill(opponent.getUniqueId());
+                this.statsManager.addDeath(player.getUniqueId());
+                this.endMatch(player, opponent);
+            }
             return;
         }
-        
-        // Limpeza completa de dados do jogador
-        PlayerState state = this.savedStates.remove(playerUUID);
+        PlayerState state = this.savedStates.remove(player.getUniqueId());
         if (state != null) {
-            this.pendingStates.put(playerUUID, state);
+            this.pendingStates.put(player.getUniqueId(), state);
             player.getInventory().clear();
             player.getInventory().setArmorContents(null);
         }
-        this.inMatch.remove(playerUUID);
-        this.deadInMatch.remove(playerUUID);
-        this.savedLevel.remove(playerUUID);
-        this.savedExp.remove(playerUUID);
-        this.matchKills.remove(playerUUID);
-        this.playerOrigins.remove(playerUUID);
-        this.playerPositions.remove(playerUUID);
-        this.activeFreezeTasks.remove(playerUUID);
+        this.inMatch.remove(player.getUniqueId());
+        this.deadInMatch.remove(player.getUniqueId());
+        this.savedLevel.remove(player.getUniqueId());
+        this.savedExp.remove(player.getUniqueId());
+        this.matchKills.remove(player.getUniqueId());
     }
 
     public void handleDeath(Player player) {
@@ -402,14 +383,6 @@ public class DuelManager {
             if (this.inMatch.contains(player.getUniqueId()) && (finalOpponent = (opponent = this.findOpponent(player))) != null && this.inMatch.contains(finalOpponent.getUniqueId())) {
                 Location playerPos = this.playerPositions.getOrDefault(player.getUniqueId(), this.pos1);
                 Location opponentPos = this.playerPositions.getOrDefault(finalOpponent.getUniqueId(), this.pos2);
-                
-                // Validate positions are not null
-                if (playerPos == null || opponentPos == null) {
-                    player.sendMessage("\u00a7cErro: Posições de arena não configuradas!");
-                    event.setRespawnLocation(this.targetLocation(player));
-                    return;
-                }
-                
                 event.setRespawnLocation(playerPos);
                 Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
                     player.teleport(playerPos);
@@ -425,14 +398,13 @@ public class DuelManager {
                         int count = i;
                         Player p = player;
                         Player op = finalOpponent;
-                        int taskId = Bukkit.getScheduler().scheduleSyncDelayedTask((Plugin)this.plugin, () -> {
+                        Bukkit.getScheduler().runTaskLater((Plugin)this.plugin, () -> {
                             p.sendTitle("\u00a76\u00a7l" + count, "", 0, 15, 5);
                             op.sendTitle("\u00a76\u00a7l" + count, "", 0, 15, 5);
                         }, (5L - (long)i) * 20L);
-                        this.countdownTasks.add(taskId);
                     }
                     int ftask = ft;
-                    int mainTaskId = Bukkit.getScheduler().scheduleSyncDelayedTask((Plugin)this.plugin, () -> {
+                    Bukkit.getScheduler().runTaskLater((Plugin)this.plugin, () -> {
                         this.stopFreeze(ftask, player, finalOpponent);
                         if (!this.inMatch.contains(player.getUniqueId()) || !this.inMatch.contains(finalOpponent.getUniqueId())) {
                             return;
@@ -448,7 +420,6 @@ public class DuelManager {
                         this.refreshEntity(player, playerPos);
                         this.refreshEntity(finalOpponent, opponentPos);
                     }, 100L);
-                    this.countdownTasks.add(mainTaskId);
                 });
                 return;
             }
@@ -482,27 +453,13 @@ public class DuelManager {
     }
 
     public void handleQuit(Player player) {
-        UUID playerUUID = player.getUniqueId();
-        
-        // Check if player is in match FIRST before removing any data
-        if (!this.inMatch.contains(playerUUID)) {
-            // Player not in match - just cleanup in case there's orphaned data
-            this.deadInMatch.remove(playerUUID);
-            this.savedLevel.remove(playerUUID);
-            this.savedExp.remove(playerUUID);
-            this.cancelActiveFreeze(player);
+        this.deadInMatch.remove(player.getUniqueId());
+        this.savedLevel.remove(player.getUniqueId());
+        this.savedExp.remove(player.getUniqueId());
+        this.cancelActiveFreeze(player);
+        if (!this.inMatch.contains(player.getUniqueId())) {
             return;
         }
-        
-        // Player is in match - cancel freeze task first
-        this.cancelActiveFreeze(player);
-        
-        // Now remove all player data
-        this.deadInMatch.remove(playerUUID);
-        this.savedLevel.remove(playerUUID);
-        this.savedExp.remove(playerUUID);
-        
-        // Finally call leaveMatch for proper handling
         this.leaveMatch(player);
     }
 
@@ -716,36 +673,20 @@ public class DuelManager {
             Location loc = this.targetLocation(p);
             p.teleport(loc);
         }
-        // Cancel all active freeze tasks
         for (Integer taskId : new HashSet<Integer>(this.activeFreezeTasks.values())) {
             Bukkit.getScheduler().cancelTask(taskId.intValue());
         }
-        // Cancel all countdown tasks
-        for (Integer taskId : this.countdownTasks) {
-            Bukkit.getScheduler().cancelTask(taskId.intValue());
-        }
-        // Cancel all queue timeout tasks
-        for (Integer taskId : this.queueTimeoutTasks.values()) {
-            Bukkit.getScheduler().cancelTask(taskId.intValue());
-        }
-        
-        // Clear all data structures
         this.activeFreezeTasks.clear();
-        this.countdownTasks.clear();
-        this.queueTimeoutTasks.clear();
         this.inMatch.clear();
         this.deadInMatch.clear();
         this.savedLevel.clear();
         this.savedExp.clear();
         this.matchKills.clear();
         this.playerPositions.clear();
-        this.playerOrigins.clear();
-        this.challenges.clear();
-        this.challengeTime.clear();
-        this.savedStates.clear();
-        this.pendingStates.clear();
-        this.denyCooldown.clear();
-        this.duelQueue.clear();
+        for (Integer taskId : this.queueTimeoutTasks.values()) {
+            Bukkit.getScheduler().cancelTask(taskId.intValue());
+        }
+        this.queueTimeoutTasks.clear();
     }
 
     public String joinQueue(Player player) {
@@ -812,22 +753,17 @@ public class DuelManager {
         this.cancelQueueTimeout(id2);
         Player p1 = Bukkit.getPlayer((UUID)id1);
         Player p2 = Bukkit.getPlayer((UUID)id2);
-        
-        // Verify both players are still online before starting match
-        if (p1 == null || !p1.isOnline()) {
+        if (p1 == null || !p1.isOnline() || p2 == null || !p2.isOnline()) {
+            if (p1 != null && p1.isOnline()) {
+                this.duelQueue.add(id1);
+                this.scheduleQueueTimeout(p1);
+            }
             if (p2 != null && p2.isOnline()) {
                 this.duelQueue.add(id2);
                 this.scheduleQueueTimeout(p2);
             }
             return;
         }
-        if (p2 == null || !p2.isOnline()) {
-            this.duelQueue.add(id1);
-            this.scheduleQueueTimeout(p1);
-            return;
-        }
-        
-        // Both players are online and ready
         this.startMatch(p1, p2);
     }
 
