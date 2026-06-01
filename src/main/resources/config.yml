@@ -26,6 +26,7 @@ kit:
     - DIAMOND_SWORD
     - BOW
     - ARROW:32
+    - DIAMOND_AXE
     - GOLDEN_APPLE:10
     - ENCHANTED_GOLDEN_APPLE
   armor:

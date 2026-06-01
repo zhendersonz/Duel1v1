@@ -394,9 +394,10 @@ public class DuelManager {
                         }
                         player.setNoDamageTicks(0);
                         finalOpponent.setNoDamageTicks(0);
+                        this.resetPlayer(player);
+                        this.resetPlayer(finalOpponent);
                         this.applyKit(player);
-                        player.setHealth(20.0);
-                        player.setFoodLevel(20);
+                        this.applyKit(finalOpponent);
                         player.sendTitle("\u00a7a\u00a7lV\u00c3O!", "", 0, 10, 10);
                         finalOpponent.sendTitle("\u00a7a\u00a7lV\u00c3O!", "", 0, 10, 10);
                         this.refreshEntity(player, playerPos);
