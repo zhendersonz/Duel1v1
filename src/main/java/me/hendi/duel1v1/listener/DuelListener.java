@@ -8,10 +8,12 @@ import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -19,7 +21,6 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.plugin.Plugin;
 
 public class DuelListener
 implements Listener {
@@ -71,6 +72,11 @@ implements Listener {
         event.setDroppedExp(0);
         event.getDrops().clear();
         this.duelManager.handleDeath(player);
+        Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
+            if (player.isOnline()) {
+                player.spigot().respawn();
+            }
+        });
     }
 
     @EventHandler(priority=EventPriority.HIGHEST)
@@ -135,8 +141,26 @@ implements Listener {
     }
 
     @EventHandler
-    public void onEntityDamage(EntityDamageByEntityEvent event) {
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (this.duelManager.isNpc(event.getEntity())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         Entity entity = event.getEntity();
+        if (this.duelManager.isNpc(entity)) {
+            event.setCancelled(true);
+            if (event.getDamager() instanceof Player) {
+                Player player = (Player) event.getDamager();
+                String err = this.duelManager.joinQueue(player);
+                if (err != null) {
+                    player.sendMessage(err);
+                }
+            }
+            return;
+        }
         if (!(entity instanceof Player)) {
             return;
         }

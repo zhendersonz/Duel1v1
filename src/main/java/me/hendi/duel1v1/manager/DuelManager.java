@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import me.hendi.duel1v1.Duel1v1;
+import me.hendi.duel1v1.stats.StatsManager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
@@ -38,6 +39,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 public class DuelManager {
     private final Duel1v1 plugin;
+    private final StatsManager statsManager;
     private final Map<UUID, UUID> challenges = new HashMap<UUID, UUID>();
     private final Map<UUID, Long> challengeTime = new HashMap<UUID, Long>();
     private final Set<UUID> inMatch = new HashSet<UUID>();
@@ -65,8 +67,9 @@ public class DuelManager {
         NPC_KEY = new NamespacedKey("duel1v1", "npc");
     }
 
-    public DuelManager(Duel1v1 plugin) {
+    public DuelManager(Duel1v1 plugin, StatsManager statsManager) {
         this.plugin = plugin;
+        this.statsManager = statsManager;
         this.loadArena();
     }
 
@@ -227,6 +230,8 @@ public class DuelManager {
         this.matchKills.put(p2.getUniqueId(), 0);
         this.playerPositions.put(p1.getUniqueId(), this.pos1);
         this.playerPositions.put(p2.getUniqueId(), this.pos2);
+        this.statsManager.addBattle(p1.getUniqueId());
+        this.statsManager.addBattle(p2.getUniqueId());
         int freezeTask = this.startFreeze(p1, p2, p1.getLocation(), p2.getLocation());
         p1.sendTitle("\u00a76\u00a7lDUELO!", "\u00a7eQue ven\u00e7a o melhor!", 0, 40, 10);
         p2.sendTitle("\u00a76\u00a7lDUELO!", "\u00a7eQue ven\u00e7a o melhor!", 0, 40, 10);
@@ -270,12 +275,19 @@ public class DuelManager {
         this.matchKills.remove(winner.getUniqueId());
         this.playerPositions.remove(loser.getUniqueId());
         this.playerPositions.remove(winner.getUniqueId());
+        this.deadInMatch.remove(winner.getUniqueId());
+        this.savedLevel.remove(loser.getUniqueId());
+        this.savedLevel.remove(winner.getUniqueId());
+        this.savedExp.remove(loser.getUniqueId());
+        this.savedExp.remove(winner.getUniqueId());
         PlayerState winnerState = this.savedStates.remove(winner.getUniqueId());
         if (winnerState != null) {
             this.applyRestore(winner, winnerState);
         }
         if ((loserState = this.savedStates.remove(loser.getUniqueId())) != null) {
             this.pendingStates.put(loser.getUniqueId(), loserState);
+            loser.getInventory().clear();
+            loser.getInventory().setArmorContents(null);
         }
         Location target = this.targetLocation(winner);
         Bukkit.broadcastMessage((String)("\u00a76\u00a7lVIT\u00d3RIA! \u00a7a" + winner.getName() + " \u00a77venceu \u00a7e" + loser.getName() + " \u00a77(" + wins + "-" + deaths + ")"));
@@ -296,6 +308,8 @@ public class DuelManager {
             Player opponent = Bukkit.getPlayer((UUID)entry.getKey());
             if (opponent != null) {
                 this.matchKills.put(opponent.getUniqueId(), this.matchKills.getOrDefault(opponent.getUniqueId(), 0) + 1);
+                this.statsManager.addKill(opponent.getUniqueId());
+                this.statsManager.addDeath(player.getUniqueId());
                 this.endMatch(player, opponent);
             }
             return;
@@ -303,8 +317,11 @@ public class DuelManager {
         PlayerState state = this.savedStates.remove(player.getUniqueId());
         if (state != null) {
             this.pendingStates.put(player.getUniqueId(), state);
+            player.getInventory().clear();
+            player.getInventory().setArmorContents(null);
         }
         this.inMatch.remove(player.getUniqueId());
+        this.deadInMatch.remove(player.getUniqueId());
         this.savedLevel.remove(player.getUniqueId());
         this.savedExp.remove(player.getUniqueId());
         this.matchKills.remove(player.getUniqueId());
@@ -329,6 +346,8 @@ public class DuelManager {
         if (winner != null) {
             int winnerKills = this.matchKills.getOrDefault(winner.getUniqueId(), 0) + 1;
             this.matchKills.put(winner.getUniqueId(), winnerKills);
+            this.statsManager.addKill(winner.getUniqueId());
+            this.statsManager.addDeath(player.getUniqueId());
             Bukkit.broadcastMessage((String)("\u00a7e" + winner.getName() + " \u00a77mata \u00a7c" + player.getName() + " \u00a77(" + winnerKills + "-" + String.valueOf(this.matchKills.getOrDefault(player.getUniqueId(), 0)) + ")"));
             if (winnerKills >= 2) {
                 this.endMatch(player, winner);
@@ -386,32 +405,37 @@ public class DuelManager {
             PlayerState pending = this.pendingStates.remove(player.getUniqueId());
             if (pending != null) {
                 Location loc = this.targetLocation(player);
+                this.applyRestore(player, pending);
+                player.teleport(loc);
                 event.setRespawnLocation(loc);
-                PlayerState fp = pending;
-                Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
-                    this.applyRestore(player, fp);
-                    player.teleport(loc);
-                });
                 return;
             }
         } else if (this.savedStates.containsKey(player.getUniqueId())) {
             this.restoreState(player);
         }
-        int level = this.savedLevel.getOrDefault(player.getUniqueId(), 0);
-        float exp = this.savedExp.getOrDefault(player.getUniqueId(), Float.valueOf(0.0f)).floatValue();
+        this.deadInMatch.remove(player.getUniqueId());
         this.savedLevel.remove(player.getUniqueId());
         this.savedExp.remove(player.getUniqueId());
+        this.activeFreezeTasks.remove(player.getUniqueId());
         Location loc = this.targetLocation(player);
         event.setRespawnLocation(loc);
         Bukkit.getScheduler().runTask((Plugin)this.plugin, () -> {
-            player.setLevel(level);
-            player.setExp(exp);
+            player.setLevel(0);
+            player.setExp(0.0f);
             player.setGameMode(GameMode.SURVIVAL);
+            player.setWalkSpeed(0.2f);
+            player.setFlySpeed(0.1f);
+            player.setAllowFlight(false);
+            player.setFlying(false);
             player.teleport(loc);
         });
     }
 
     public void handleQuit(Player player) {
+        this.deadInMatch.remove(player.getUniqueId());
+        this.savedLevel.remove(player.getUniqueId());
+        this.savedExp.remove(player.getUniqueId());
+        this.cancelActiveFreeze(player);
         if (!this.inMatch.contains(player.getUniqueId())) {
             return;
         }
@@ -455,9 +479,11 @@ public class DuelManager {
         if (taskId != null) {
             Bukkit.getScheduler().cancelTask(taskId.intValue());
         }
-        player.setWalkSpeed(0.2f);
-        player.setFlySpeed(0.1f);
-        player.setFlying(false);
+        if (player.isOnline()) {
+            player.setWalkSpeed(0.2f);
+            player.setFlySpeed(0.1f);
+            player.setFlying(false);
+        }
     }
 
     private void refreshEntity(Player player, Location target) {
@@ -534,6 +560,10 @@ public class DuelManager {
     }
 
     public void restoreOnRejoin(Player player) {
+        this.deadInMatch.remove(player.getUniqueId());
+        this.savedLevel.remove(player.getUniqueId());
+        this.savedExp.remove(player.getUniqueId());
+        this.activeFreezeTasks.remove(player.getUniqueId());
         PlayerState state = this.pendingStates.remove(player.getUniqueId());
         if (state != null) {
             this.applyRestore(player, state);
@@ -851,4 +881,3 @@ public class DuelManager {
     private record PlayerState(ItemStack[] inventory, ItemStack[] armor, Location location, GameMode gameMode, double health, int foodLevel, int level, float exp, float walkSpeed, float flySpeed, boolean allowFlight, boolean flying) {
     }
 }
-
