@@ -264,6 +264,9 @@ public class DuelManager {
     }
 
     public void endMatch(Player loser, Player winner) {
+        if (!this.inMatch.contains(loser.getUniqueId()) || !this.inMatch.contains(winner.getUniqueId())) {
+            return;
+        }
         PlayerState loserState;
         this.cancelActiveFreeze(loser);
         this.cancelActiveFreeze(winner);
@@ -349,7 +352,7 @@ public class DuelManager {
             this.statsManager.addKill(winner.getUniqueId());
             this.statsManager.addDeath(player.getUniqueId());
             Bukkit.broadcastMessage((String)("\u00a7e" + winner.getName() + " \u00a77mata \u00a7c" + player.getName() + " \u00a77(" + winnerKills + "-" + String.valueOf(this.matchKills.getOrDefault(player.getUniqueId(), 0)) + ")"));
-            if (winnerKills >= 2) {
+            if (winnerKills >= KILL_LIMIT) {
                 this.endMatch(player, winner);
             }
         }
@@ -692,6 +695,7 @@ public class DuelManager {
             return "\u00a7cVoc\u00ea n\u00e3o est\u00e1 na fila!";
         }
         this.cancelQueueTimeout(player.getUniqueId());
+        player.sendTitle("", "", 0, 1, 0);
         player.sendMessage("\u00a7cVoc\u00ea saiu da fila de duelos.");
         return null;
     }

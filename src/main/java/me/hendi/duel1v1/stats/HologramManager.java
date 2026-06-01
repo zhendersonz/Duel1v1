@@ -118,7 +118,6 @@ public class HologramManager {
             String color = (i == 0) ? "\u00a76" : "\u00a7e";
             textLines.add(color + "#" + (i + 1) + " \u00a78-  \u00a77Kills:\u00a78-  \u00a77Mortes:\u00a78-  \u00a77K/D:\u00a78-");
         }
-        }
         int idx = 0;
         for (String line : textLines) {
             Location loc = base.clone().subtract(0.0, idx * 0.25, 0.0);
@@ -144,7 +143,7 @@ public class HologramManager {
 
     private void startAutoUpdate() {
         this.stopAutoUpdate();
-        this.updateTaskId = Bukkit.getScheduler().runTaskTimer(this.plugin, this::update, 0L, 600L).getTaskId();
+        this.updateTaskId = Bukkit.getScheduler().runTaskTimer(this.plugin, this::update, 600L, 600L).getTaskId();
     }
 
     private void stopAutoUpdate() {
