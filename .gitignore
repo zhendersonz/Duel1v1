@@ -4,3 +4,4 @@ target/
 !.gitignore
 .DS_Store
 *.log
+push_log.txt
