@@ -16,6 +16,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -64,6 +65,11 @@ implements Listener {
                 player.sendMessage(err);
             }
         }
+    }
+
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
+    public void onCreatureSpawn(CreatureSpawnEvent event) {
+        this.duelManager.handleNpcCreatureSpawn(event);
     }
 
     @EventHandler

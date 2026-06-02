@@ -25,6 +25,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -34,6 +35,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -57,12 +59,16 @@ public class DuelManager {
     private static final int KILL_LIMIT = 2;
     private static final long QUEUE_TIMEOUT_TICKS = 1200L;
     private static final NamespacedKey NPC_KEY;
+    private static final String[] NPC_SCOREBOARD_TAGS = new String[]{"duel1v1_npc", "clearlag_ignore", "clearlagg_ignore", "ClearLagIgnore", "protected_entity"};
     private final Queue<UUID> duelQueue = new LinkedList<UUID>();
     private Location pos1;
     private Location pos2;
     private Location lobby;
     private boolean lobbySet;
     private UUID npcUid;
+    private boolean npcSpawnInProgress;
+    private Location npcSpawnLocation;
+    private int npcWatchdogTask = -1;
 
     static {
         NPC_KEY = new NamespacedKey("duel1v1", "npc");
@@ -72,6 +78,7 @@ public class DuelManager {
         this.plugin = plugin;
         this.statsManager = statsManager;
         this.loadArena();
+        this.startNpcWatchdog();
     }
 
     private void loadArena() {
@@ -690,6 +697,7 @@ public class DuelManager {
             Bukkit.getScheduler().cancelTask(taskId.intValue());
         }
         this.queueTimeoutTasks.clear();
+        this.cancelNpcWatchdog();
     }
 
     public String joinQueue(Player player) {
@@ -833,16 +841,7 @@ public class DuelManager {
     public void spawnNpc(Player player) {
         Location loc = player.getLocation();
         this.removeNpc();
-        Villager npc = loc.getWorld().spawn(loc, Villager.class, v -> {
-            v.setAI(false);
-            v.setInvulnerable(true);
-            v.setSilent(true);
-            v.setCollidable(false);
-            v.setGravity(false);
-            v.setCustomNameVisible(true);
-            v.customName(Component.text("\u00a7e\u00a7lCLIQUE PARA DUELAR"));
-            v.getPersistentDataContainer().set(NPC_KEY, PersistentDataType.BOOLEAN, true);
-        });
+        Villager npc = this.spawnProtectedNpc(loc);
         this.npcUid = npc.getUniqueId();
         String prefix = "npc.";
         this.plugin.getConfig().set(prefix + "world", loc.getWorld().getName());
@@ -877,6 +876,13 @@ public class DuelManager {
         return entity.getPersistentDataContainer().has(NPC_KEY, PersistentDataType.BOOLEAN);
     }
 
+    public void handleNpcCreatureSpawn(CreatureSpawnEvent event) {
+        if (this.isNpcSpawnAttempt(event.getLocation(), event.getEntityType())) {
+            event.setCancelled(false);
+            this.protectNpc((Villager)event.getEntity());
+        }
+    }
+
     public void loadNpc() {
         ConfigurationSection npcSection = this.plugin.getConfig().getConfigurationSection("npc");
         if (npcSection == null) {
@@ -886,17 +892,80 @@ public class DuelManager {
         if (loc == null || loc.getWorld() == null) {
             return;
         }
-        Villager npc = loc.getWorld().spawn(loc, Villager.class, v -> {
-            v.setAI(false);
-            v.setInvulnerable(true);
-            v.setSilent(true);
-            v.setCollidable(false);
-            v.setGravity(false);
-            v.setCustomNameVisible(true);
-            v.customName(Component.text("\u00a7e\u00a7lCLIQUE PARA DUELAR"));
-            v.getPersistentDataContainer().set(NPC_KEY, PersistentDataType.BOOLEAN, true);
-        });
+        Villager npc = this.spawnProtectedNpc(loc);
         this.npcUid = npc.getUniqueId();
+    }
+
+    private Villager spawnProtectedNpc(Location loc) {
+        this.npcSpawnInProgress = true;
+        this.npcSpawnLocation = loc.clone();
+        try {
+            return loc.getWorld().spawn(loc, Villager.class, this::protectNpc);
+        }
+        finally {
+            this.npcSpawnInProgress = false;
+            this.npcSpawnLocation = null;
+        }
+    }
+
+    private void protectNpc(Villager npc) {
+        npc.setAI(false);
+        npc.setInvulnerable(true);
+        npc.setSilent(true);
+        npc.setCollidable(false);
+        npc.setGravity(false);
+        npc.setPersistent(true);
+        npc.setRemoveWhenFarAway(false);
+        npc.setCustomNameVisible(true);
+        npc.customName(Component.text("\u00a7e\u00a7lCLIQUE PARA DUELAR"));
+        npc.getPersistentDataContainer().set(NPC_KEY, PersistentDataType.BOOLEAN, true);
+        npc.setMetadata("Duel1v1NPC", new FixedMetadataValue(this.plugin, true));
+        npc.setMetadata("NPC", new FixedMetadataValue(this.plugin, true));
+        npc.setMetadata("ClearLagIgnore", new FixedMetadataValue(this.plugin, true));
+        npc.setMetadata("clearlag_ignore", new FixedMetadataValue(this.plugin, true));
+        npc.setMetadata("clearlagg_ignore", new FixedMetadataValue(this.plugin, true));
+        for (String tag : NPC_SCOREBOARD_TAGS) {
+            npc.addScoreboardTag(tag);
+        }
+    }
+
+    private boolean isNpcSpawnAttempt(Location loc, EntityType type) {
+        if (!this.npcSpawnInProgress || type != EntityType.VILLAGER || this.npcSpawnLocation == null || loc.getWorld() == null) {
+            return false;
+        }
+        return loc.getWorld().equals(this.npcSpawnLocation.getWorld()) && loc.distanceSquared(this.npcSpawnLocation) <= 4.0;
+    }
+
+    private void startNpcWatchdog() {
+        this.cancelNpcWatchdog();
+        this.npcWatchdogTask = Bukkit.getScheduler().runTaskTimer((Plugin)this.plugin, () -> {
+            ConfigurationSection npcSection = this.plugin.getConfig().getConfigurationSection("npc");
+            if (npcSection == null) {
+                return;
+            }
+            if (this.npcUid != null) {
+                for (org.bukkit.World world : Bukkit.getWorlds()) {
+                    Entity entity = world.getEntity(this.npcUid);
+                    if (entity instanceof Villager) {
+                        this.protectNpc((Villager)entity);
+                        return;
+                    }
+                }
+            }
+            Location loc = this.deserializeLocation(npcSection);
+            if (loc == null || loc.getWorld() == null) {
+                return;
+            }
+            Villager npc = this.spawnProtectedNpc(loc);
+            this.npcUid = npc.getUniqueId();
+        }, 200L, 200L).getTaskId();
+    }
+
+    private void cancelNpcWatchdog() {
+        if (this.npcWatchdogTask != -1) {
+            Bukkit.getScheduler().cancelTask(this.npcWatchdogTask);
+            this.npcWatchdogTask = -1;
+        }
     }
 
     public Location getLobby() {

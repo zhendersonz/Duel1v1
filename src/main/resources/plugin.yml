@@ -4,6 +4,7 @@ main: me.hendi.duel1v1.Duel1v1
 api-version: '1.21'
 author: Hendi
 description: Plugin simples para duelos 1v1
+softdepend: [WorldGuard, ClearLag, ClearLagg, ClearLaggEnhanced]
 
 commands:
   duelo:
