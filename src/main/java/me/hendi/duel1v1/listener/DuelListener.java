@@ -18,9 +18,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
-import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -256,25 +254,9 @@ implements Listener {
         }
     }
 
-    @EventHandler
-    public void onFoodChange(FoodLevelChangeEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
-            if (this.duelManager.isInMatch(player)) {
-                event.setCancelled(true);
-            }
-        }
-    }
 
-    @EventHandler
-    public void onRegen(EntityRegainHealthEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
-            if (this.duelManager.isInMatch(player)) {
-                event.setCancelled(true);
-            }
-        }
-    }
+
+
 
     @EventHandler
     public void onCommand(PlayerCommandPreprocessEvent event) {
