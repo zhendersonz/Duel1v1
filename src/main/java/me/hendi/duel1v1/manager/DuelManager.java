@@ -38,6 +38,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.RayTraceResult;
 
 public class DuelManager {
     private final Duel1v1 plugin;
@@ -874,6 +875,12 @@ public class DuelManager {
 
     public boolean isNpc(Entity entity) {
         return entity.getPersistentDataContainer().has(NPC_KEY, PersistentDataType.BOOLEAN);
+    }
+
+    public boolean isLookingAtNpc(Player player) {
+        Location eye = player.getEyeLocation();
+        RayTraceResult result = player.getWorld().rayTraceEntities(eye, eye.getDirection(), 6.0, 0.8, this::isNpc);
+        return result != null && result.getHitEntity() != null;
     }
 
     public void handleNpcCreatureSpawn(CreatureSpawnEvent event) {

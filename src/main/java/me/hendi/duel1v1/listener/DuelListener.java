@@ -1,5 +1,7 @@
 package me.hendi.duel1v1.listener;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import me.hendi.duel1v1.Duel1v1;
 import me.hendi.duel1v1.manager.DuelManager;
@@ -11,6 +13,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -21,9 +24,12 @@ import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractAtEntityEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -33,6 +39,7 @@ public class DuelListener
 implements Listener {
     private final Duel1v1 plugin;
     private final DuelManager duelManager;
+    private final Map<UUID, Long> npcClickCooldown = new HashMap<UUID, Long>();
 
     public DuelListener(Duel1v1 plugin, DuelManager duelManager) {
         this.plugin = plugin;
@@ -55,15 +62,40 @@ implements Listener {
         this.plugin.saveConfig();
     }
 
-    @EventHandler
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
     public void onNpcInteract(PlayerInteractEntityEvent event) {
         if (this.duelManager.isNpc(event.getRightClicked())) {
             event.setCancelled(true);
-            Player player = event.getPlayer();
-            String err = this.duelManager.joinQueue(player);
-            if (err != null) {
-                player.sendMessage(err);
-            }
+            this.activateDuelNpc(event.getPlayer());
+        }
+    }
+
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
+    public void onNpcInteractAt(PlayerInteractAtEntityEvent event) {
+        if (this.duelManager.isNpc(event.getRightClicked())) {
+            event.setCancelled(true);
+            this.activateDuelNpc(event.getPlayer());
+        }
+    }
+
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
+    public void onNpcScreenTap(PlayerInteractEvent event) {
+        Action action = event.getAction();
+        if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK && action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (this.duelManager.isLookingAtNpc(player)) {
+            event.setCancelled(true);
+            this.activateDuelNpc(player);
+        }
+    }
+
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
+    public void onNpcArmSwing(PlayerAnimationEvent event) {
+        Player player = event.getPlayer();
+        if (this.duelManager.isLookingAtNpc(player)) {
+            this.activateDuelNpc(player);
         }
     }
 
@@ -159,17 +191,13 @@ implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority=EventPriority.HIGHEST, ignoreCancelled=false)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         Entity entity = event.getEntity();
         if (this.duelManager.isNpc(entity)) {
             event.setCancelled(true);
             if (event.getDamager() instanceof Player) {
-                Player player = (Player) event.getDamager();
-                String err = this.duelManager.joinQueue(player);
-                if (err != null) {
-                    player.sendMessage(err);
-                }
+                this.activateDuelNpc((Player) event.getDamager());
             }
             return;
         }
@@ -188,6 +216,19 @@ implements Listener {
             event.setCancelled(true);
         } else if (damagerInMatch && !damagedInMatch) {
             event.setCancelled(true);
+        }
+    }
+
+    private void activateDuelNpc(Player player) {
+        long now = System.currentTimeMillis();
+        long lastClick = this.npcClickCooldown.getOrDefault(player.getUniqueId(), 0L);
+        if (now - lastClick < 600L) {
+            return;
+        }
+        this.npcClickCooldown.put(player.getUniqueId(), now);
+        String err = this.duelManager.joinQueue(player);
+        if (err != null) {
+            player.sendMessage(err);
         }
     }
 
