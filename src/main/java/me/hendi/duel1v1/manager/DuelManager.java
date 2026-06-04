@@ -128,6 +128,9 @@ public class DuelManager {
     }
 
     public String challenge(Player sender, Player target) {
+        if (!this.inMatch.isEmpty()) {
+            return "\u00a7cJ\u00e1 est\u00e1 ocorrendo um duelo! Tente novamente mais tarde.";
+        }
         if (sender.equals((Object)target)) {
             return "\u00a7cVoc\u00ea n\u00e3o pode desafiar a si mesmo!";
         }
@@ -197,6 +200,9 @@ public class DuelManager {
     }
 
     public String accept(Player player, Player target) {
+        if (!this.inMatch.isEmpty()) {
+            return "\u00a7cJ\u00e1 est\u00e1 ocorrendo um duelo! Tente novamente mais tarde.";
+        }
         UUID targetId = target.getUniqueId();
         if (!this.challenges.containsKey(player.getUniqueId()) || !this.challenges.get(player.getUniqueId()).equals(targetId)) {
             return "\u00a7cVoc\u00ea n\u00e3o tem um desafio pendente deste jogador!";
