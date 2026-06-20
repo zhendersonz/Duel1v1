@@ -12,8 +12,8 @@ commands:
     usage: /<command> <jogador> | aceitar <jogador> | recusar <jogador> | sair | cancelar
     aliases: [duel]
   duelonpc:
-    description: Cria um NPC clicável para entrar na fila de duelos
-    usage: /<command>
+    description: Gerencia o NPC clicável da fila de duelos
+    usage: /<command> [remover]
     permission: duel.admin
 
 permissions:

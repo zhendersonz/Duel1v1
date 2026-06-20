@@ -136,6 +136,9 @@ public class HologramManager {
         if (loc == null || loc.getWorld() == null) {
             return;
         }
+        loc.getWorld().getNearbyEntities(loc, 0.5, 1.0, 0.5).stream()
+            .filter(e -> e instanceof ArmorStand)
+            .forEach(e -> e.remove());
         this.buildLines(loc);
         this.update();
         this.startAutoUpdate();

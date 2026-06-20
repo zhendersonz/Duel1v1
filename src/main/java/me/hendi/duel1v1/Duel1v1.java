@@ -33,8 +33,13 @@ extends JavaPlugin {
                 player.sendMessage("\u00a7cSem permiss\u00e3o!");
                 return true;
             }
-            this.duelManager.spawnNpc(player);
-            player.sendMessage("\u00a7aNPC de duelo criado!");
+            if (args.length > 0 && (args[0].equalsIgnoreCase("remover") || args[0].equalsIgnoreCase("remove"))) {
+                this.duelManager.deleteNpc();
+                player.sendMessage("\u00a7aNPC de duelo removido!");
+            } else {
+                this.duelManager.spawnNpc(player);
+                player.sendMessage("\u00a7aNPC de duelo criado!");
+            }
             return true;
         });
         this.getServer().getPluginManager().registerEvents((Listener)new DuelListener(this, this.duelManager), (Plugin)this);
