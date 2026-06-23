@@ -348,6 +348,16 @@ public class DuelManager {
                 this.statsManager.addKill(opponent.getUniqueId());
                 this.statsManager.addDeath(player.getUniqueId());
                 this.endMatch(player, opponent);
+                UUID leaverUuid = player.getUniqueId();
+                Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+                    PlayerState pending = this.pendingStates.remove(leaverUuid);
+                    if (pending != null) {
+                        Player p = Bukkit.getPlayer(leaverUuid);
+                        if (p != null && p.isOnline()) {
+                            this.applyRestore(p, pending);
+                        }
+                    }
+                }, 80L);
             }
             return;
         }
@@ -362,6 +372,11 @@ public class DuelManager {
         this.savedLevel.remove(player.getUniqueId());
         this.savedExp.remove(player.getUniqueId());
         this.matchKills.remove(player.getUniqueId());
+        PlayerState pending = this.pendingStates.remove(player.getUniqueId());
+        if (pending != null) {
+            this.applyRestore(player, pending);
+        }
+        player.teleport(this.targetLocation(player));
     }
 
     public void handleDeath(Player player) {
@@ -828,6 +843,13 @@ public class DuelManager {
 
     public boolean isInMatch(Player player) {
         return this.inMatch.contains(player.getUniqueId());
+    }
+
+    public boolean isOpponent(Player p1, Player p2) {
+        return this.inMatch.contains(p1.getUniqueId())
+            && this.inMatch.contains(p2.getUniqueId())
+            && this.savedStates.containsKey(p1.getUniqueId())
+            && this.savedStates.containsKey(p2.getUniqueId());
     }
 
     public String getGuiTitle() {

@@ -21,6 +21,20 @@ public class HologramManager {
         this.statsManager = statsManager;
     }
 
+    public List<ArmorStand> getLines() {
+        return this.lines;
+    }
+
+    public void removeLine(ArmorStand as) {
+        as.remove();
+        this.lines.remove(as);
+        if (this.lines.isEmpty()) {
+            this.stopAutoUpdate();
+            this.plugin.getConfig().set("hologram", null);
+            this.plugin.saveConfig();
+        }
+    }
+
     public void create(Player player) {
         this.remove();
         Location loc = player.getLocation().add(0.0, 1.0, 0.0);

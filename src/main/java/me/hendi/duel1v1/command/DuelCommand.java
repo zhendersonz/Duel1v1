@@ -9,7 +9,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
+import org.bukkit.util.RayTraceResult;
 
 public class DuelCommand
 implements CommandExecutor {
@@ -203,8 +205,22 @@ implements CommandExecutor {
                 break;
             }
             case "remover": {
-                this.hologramManager.delete();
-                player.sendMessage("\u00a7cHolograma removido!");
+                if (args.length >= 3 && (args[2].equalsIgnoreCase("olhando") || args[2].equalsIgnoreCase("look"))) {
+                    RayTraceResult result = player.getWorld().rayTraceEntities(
+                        player.getEyeLocation(), player.getEyeLocation().getDirection(), 10.0, 0.5,
+                        e -> e instanceof ArmorStand
+                    );
+                    if (result != null && result.getHitEntity() instanceof ArmorStand) {
+                        ArmorStand target = (ArmorStand) result.getHitEntity();
+                        this.hologramManager.removeLine(target);
+                        player.sendMessage("\u00a7aHolograma removido!");
+                    } else {
+                        player.sendMessage("\u00a7cNenhum holograma encontrado!");
+                    }
+                } else {
+                    this.hologramManager.delete();
+                    player.sendMessage("\u00a7cHolograma removido!");
+                }
                 break;
             }
             case "atualizar": {

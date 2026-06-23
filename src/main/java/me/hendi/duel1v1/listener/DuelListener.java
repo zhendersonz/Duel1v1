@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -199,20 +200,37 @@ implements Listener {
             }
             return;
         }
+        Entity damagerEntity = event.getDamager();
+        Player shooter = null;
+        if (damagerEntity instanceof Projectile) {
+            Projectile proj = (Projectile) damagerEntity;
+            if (proj.getShooter() instanceof Player) {
+                shooter = (Player) proj.getShooter();
+            }
+        }
+        if (shooter != null) {
+            if (this.duelManager.isInMatch(shooter)) {
+                if (!(entity instanceof Player) || !this.duelManager.isOpponent(shooter, (Player) entity)) {
+                    event.setCancelled(true);
+                }
+            }
+            return;
+        }
         if (!(entity instanceof Player)) {
             return;
         }
         Player damaged = (Player)entity;
-        Entity entity2 = event.getDamager();
-        if (!(entity2 instanceof Player)) {
+        if (!(damagerEntity instanceof Player)) {
             return;
         }
-        Player damager = (Player)entity2;
+        Player damager = (Player)damagerEntity;
         boolean damagedInMatch = this.duelManager.isInMatch(damaged);
         boolean damagerInMatch = this.duelManager.isInMatch(damager);
-        if (damagedInMatch && !damagerInMatch) {
-            event.setCancelled(true);
-        } else if (damagerInMatch && !damagedInMatch) {
+        if (damagedInMatch && damagerInMatch) {
+            if (!this.duelManager.isOpponent(damager, damaged)) {
+                event.setCancelled(true);
+            }
+        } else if (damagedInMatch || damagerInMatch) {
             event.setCancelled(true);
         }
     }
