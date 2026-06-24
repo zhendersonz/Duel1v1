@@ -378,10 +378,10 @@ public class DuelManager {
             // Schedule restoration of the player who left
             UUID leaverUuid = uuid;
             Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
-                PlayerState pending = this.pendingStatesManager.remove(leaverUuid);
-                if (pending != null) {
-                    Player p = Bukkit.getPlayer(leaverUuid);
-                    if (p != null && p.isOnline()) {
+                Player p = Bukkit.getPlayer(leaverUuid);
+                if (p != null && p.isOnline()) {
+                    PlayerState pending = this.pendingStatesManager.remove(leaverUuid);
+                    if (pending != null) {
                         this.applyRestore(p, pending);
                     }
                 }
