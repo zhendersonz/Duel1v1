@@ -1,6 +1,7 @@
 package me.hendi.duel1v1;
 
 import me.hendi.duel1v1.command.DuelCommand;
+import me.hendi.duel1v1.hook.WorldGuardHook;
 import me.hendi.duel1v1.listener.DuelListener;
 import me.hendi.duel1v1.manager.DuelManager;
 import me.hendi.duel1v1.stats.HologramManager;
@@ -20,6 +21,7 @@ extends JavaPlugin {
 
     public void onEnable() {
         this.saveDefaultConfig();
+        WorldGuardHook.init();
         this.pendingStatesManager = new PendingStatesManager(this);
         this.pendingStatesManager.load();
         this.statsManager = new StatsManager(this);
