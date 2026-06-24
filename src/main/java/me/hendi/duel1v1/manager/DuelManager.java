@@ -1,5 +1,6 @@
 package me.hendi.duel1v1.manager;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -10,6 +11,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import me.hendi.duel1v1.Duel1v1;
+import me.hendi.duel1v1.model.PlayerState;
+import me.hendi.duel1v1.PendingStatesManager;
 import me.hendi.duel1v1.stats.StatsManager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -43,6 +46,7 @@ import org.bukkit.util.RayTraceResult;
 public class DuelManager {
     private final Duel1v1 plugin;
     private final StatsManager statsManager;
+    private final PendingStatesManager pendingStatesManager;
     private final Map<UUID, UUID> challenges = new HashMap<UUID, UUID>();
     private final Map<UUID, Long> challengeTime = new HashMap<UUID, Long>();
     private final Set<UUID> inMatch = new HashSet<UUID>();
@@ -52,7 +56,6 @@ public class DuelManager {
     private final Map<UUID, Float> savedExp = new HashMap<UUID, Float>();
     private final Map<UUID, Long> denyCooldown = new HashMap<UUID, Long>();
     private final Map<UUID, Integer> matchKills = new HashMap<UUID, Integer>();
-    private final Map<UUID, PlayerState> pendingStates = new HashMap<UUID, PlayerState>();
     private final Map<UUID, Location> playerPositions = new HashMap<UUID, Location>();
     private final Map<UUID, Location> playerOrigins = new HashMap<UUID, Location>();
     private final Map<UUID, Integer> activeFreezeTasks = new HashMap<UUID, Integer>();
@@ -75,9 +78,10 @@ public class DuelManager {
         NPC_KEY = new NamespacedKey("duel1v1", "npc");
     }
 
-    public DuelManager(Duel1v1 plugin, StatsManager statsManager) {
+    public DuelManager(Duel1v1 plugin, StatsManager statsManager, PendingStatesManager pendingStatesManager) {
         this.plugin = plugin;
         this.statsManager = statsManager;
+        this.pendingStatesManager = pendingStatesManager;
         this.loadArena();
         this.startNpcWatchdog();
     }
@@ -312,7 +316,7 @@ public class DuelManager {
             this.applyRestore(winner, winnerState);
         }
         if ((loserState = this.savedStates.remove(loserUUID)) != null) {
-            this.pendingStates.put(loserUUID, loserState);
+            // pendingStates is now handled by leaveMatchInternal/handleKickOrBan
             loser.getInventory().clear();
             loser.getInventory().setArmorContents(null);
         }
@@ -336,47 +340,87 @@ public class DuelManager {
     }
 
     public void leaveMatch(Player player) {
+        this.leaveMatchInternal(player, true);
+    }
+
+    private void leaveMatchInternal(Player player, boolean teleport) {
         if (!this.inMatch.contains(player.getUniqueId())) {
-            player.sendMessage("\u00a7cVoc\u00ea n\u00e3o est\u00e1 em uma partida!");
-            return;
-        }
-        for (Map.Entry<UUID, PlayerState> entry : this.savedStates.entrySet()) {
-            if (!this.inMatch.contains(entry.getKey()) || entry.getKey().equals(player.getUniqueId())) continue;
-            Player opponent = Bukkit.getPlayer((UUID)entry.getKey());
-            if (opponent != null) {
-                this.matchKills.put(opponent.getUniqueId(), this.matchKills.getOrDefault(opponent.getUniqueId(), 0) + 1);
-                this.statsManager.addKill(opponent.getUniqueId());
-                this.statsManager.addDeath(player.getUniqueId());
-                this.endMatch(player, opponent);
-                UUID leaverUuid = player.getUniqueId();
-                Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
-                    PlayerState pending = this.pendingStates.remove(leaverUuid);
-                    if (pending != null) {
-                        Player p = Bukkit.getPlayer(leaverUuid);
-                        if (p != null && p.isOnline()) {
-                            this.applyRestore(p, pending);
-                        }
-                    }
-                }, 80L);
+            if (teleport) {
+                player.sendMessage("\u00a7cVoc\u00ea n\u00e3o est\u00e1 em uma partida!");
             }
             return;
         }
-        PlayerState state = this.savedStates.remove(player.getUniqueId());
+        
+        UUID uuid = player.getUniqueId();
+        Player opponent = null;
+        
+        // Find opponent
+        for (Map.Entry<UUID, PlayerState> entry : this.savedStates.entrySet()) {
+            if (!this.inMatch.contains(entry.getKey()) || entry.getKey().equals(uuid)) continue;
+            opponent = Bukkit.getPlayer((UUID)entry.getKey());
+            if (opponent != null) {
+                break;
+            }
+        }
+        
+        if (opponent != null) {
+            // Save original state BEFORE endMatch clears savedStates
+            PlayerState original = this.savedStates.get(uuid);
+            if (original != null) {
+                this.pendingStatesManager.put(uuid, original);
+            }
+            
+            this.matchKills.put(opponent.getUniqueId(), this.matchKills.getOrDefault(opponent.getUniqueId(), 0) + 1);
+            this.statsManager.addKill(opponent.getUniqueId());
+            this.statsManager.addDeath(uuid);
+            this.endMatch(player, opponent);
+            
+            // Schedule restoration of the player who left
+            UUID leaverUuid = uuid;
+            Bukkit.getScheduler().runTaskLater(this.plugin, () -> {
+                PlayerState pending = this.pendingStatesManager.remove(leaverUuid);
+                if (pending != null) {
+                    Player p = Bukkit.getPlayer(leaverUuid);
+                    if (p != null && p.isOnline()) {
+                        this.applyRestore(p, pending);
+                    }
+                }
+            }, 80L);
+            
+            if (teleport) {
+                // Teleport happens in endMatch's scheduled task
+            }
+            return;
+        }
+        
+        // No opponent found - cleanup without opponent
+        PlayerState state = this.savedStates.remove(uuid);
         if (state != null) {
-            this.pendingStates.put(player.getUniqueId(), state);
-            player.getInventory().clear();
-            player.getInventory().setArmorContents(null);
+            this.applyRestore(player, state);
         }
-        this.inMatch.remove(player.getUniqueId());
-        this.deadInMatch.remove(player.getUniqueId());
-        this.savedLevel.remove(player.getUniqueId());
-        this.savedExp.remove(player.getUniqueId());
-        this.matchKills.remove(player.getUniqueId());
-        PlayerState pending = this.pendingStates.remove(player.getUniqueId());
-        if (pending != null) {
-            this.applyRestore(player, pending);
+        this.inMatch.remove(uuid);
+        this.deadInMatch.remove(uuid);
+        this.savedLevel.remove(uuid);
+        this.savedExp.remove(uuid);
+        this.matchKills.remove(uuid);
+        if (teleport) {
+            player.teleport(this.targetLocation(player));
         }
-        player.teleport(this.targetLocation(player));
+    }
+
+    public void handleKickOrBan(Player player) {
+        UUID uuid = player.getUniqueId();
+        
+        if (this.inMatch.contains(uuid)) {
+            PlayerState original = this.savedStates.get(uuid);
+            if (original != null) {
+                this.pendingStatesManager.put(uuid, original);
+            }
+            
+            this.leaveMatchInternal(player, false);
+        } else if (this.duelQueue.contains(uuid)) {
+            this.leaveQueue(player);
+        }
     }
 
     public void handleDeath(Player player) {
@@ -402,6 +446,10 @@ public class DuelManager {
             this.statsManager.addDeath(player.getUniqueId());
             Bukkit.broadcastMessage((String)("\u00a7e" + winner.getName() + " \u00a77mata \u00a7c" + player.getName() + " \u00a77(" + winnerKills + "-" + String.valueOf(this.matchKills.getOrDefault(player.getUniqueId(), 0)) + ")"));
             if (winnerKills >= KILL_LIMIT) {
+                PlayerState loserState = this.savedStates.get(player.getUniqueId());
+                if (loserState != null) {
+                    this.pendingStatesManager.put(player.getUniqueId(), loserState);
+                }
                 this.endMatch(player, winner);
             }
         }
@@ -455,7 +503,7 @@ public class DuelManager {
                 });
                 return;
             }
-            PlayerState pending = this.pendingStates.remove(player.getUniqueId());
+            PlayerState pending = this.pendingStatesManager.remove(player.getUniqueId());
             if (pending != null) {
                 Location loc = this.targetLocation(player);
                 this.applyRestore(player, pending);
@@ -492,7 +540,7 @@ public class DuelManager {
         if (!this.inMatch.contains(player.getUniqueId())) {
             return;
         }
-        this.leaveMatch(player);
+        this.handleKickOrBan(player);
     }
 
     private int startFreeze(Player p1, Player p2, Location l1, Location l2) {
@@ -575,6 +623,7 @@ public class DuelManager {
         int i;
         ItemStack[] inv = player.getInventory().getContents();
         ItemStack[] armor = player.getInventory().getArmorContents();
+        ItemStack offhand = player.getInventory().getItemInOffHand();
         for (i = 0; i < inv.length; ++i) {
             if (inv[i] == null) continue;
             inv[i] = inv[i].clone();
@@ -583,7 +632,10 @@ public class DuelManager {
             if (armor[i] == null) continue;
             armor[i] = armor[i].clone();
         }
-        return new PlayerState(inv, armor, player.getLocation(), player.getGameMode(), player.getHealth(), player.getFoodLevel(), player.getLevel(), player.getExp(), player.getWalkSpeed(), player.getFlySpeed(), player.getAllowFlight(), player.isFlying());
+        if (offhand != null) {
+            offhand = offhand.clone();
+        }
+        return new PlayerState(inv, armor, offhand, player.getLocation(), player.getGameMode(), player.getHealth(), player.getFoodLevel(), player.getLevel(), player.getExp(), player.getWalkSpeed(), player.getFlySpeed(), player.getAllowFlight(), player.isFlying());
     }
 
     private void restoreState(Player player) {
@@ -597,7 +649,11 @@ public class DuelManager {
         player.getInventory().clear();
         player.getInventory().setContents(state.inventory());
         player.getInventory().setArmorContents(state.armor());
-        player.teleport(state.location());
+        player.getInventory().setItemInOffHand(state.offHandItem());
+        Location loc = state.location();
+        if (loc != null) {
+            player.teleport(loc);
+        }
         player.setGameMode(state.gameMode());
         player.setHealth(state.health());
         player.setFoodLevel(state.foodLevel());
@@ -607,9 +663,7 @@ public class DuelManager {
         player.setFlySpeed(state.flySpeed());
         player.setAllowFlight(state.allowFlight());
         player.setFlying(state.flying() && state.allowFlight());
-        for (PotionEffect effect : player.getActivePotionEffects()) {
-            player.removePotionEffect(effect.getType());
-        }
+        new ArrayList<>(player.getActivePotionEffects()).forEach(e -> player.removePotionEffect(e.getType()));
     }
 
     public void restoreOnRejoin(Player player) {
@@ -617,7 +671,7 @@ public class DuelManager {
         this.savedLevel.remove(player.getUniqueId());
         this.savedExp.remove(player.getUniqueId());
         this.activeFreezeTasks.remove(player.getUniqueId());
-        PlayerState state = this.pendingStates.remove(player.getUniqueId());
+        PlayerState state = this.pendingStatesManager.remove(player.getUniqueId());
         if (state != null) {
             this.applyRestore(player, state);
             player.sendMessage("\u00a7aSeus itens foram restaurados ap\u00f3s desconectar durante um duelo.");
@@ -647,11 +701,11 @@ public class DuelManager {
         player.setNoDamageTicks(0);
         player.setAllowFlight(true);
         player.setFlying(false);
-        player.getActivePotionEffects().forEach(e -> player.removePotionEffect(e.getType()));
+        new ArrayList<>(player.getActivePotionEffects()).forEach(e -> player.removePotionEffect(e.getType()));
         player.getInventory().clear();
         player.getInventory().setArmorContents(null);
     }
-
+    
     private Location targetLocation(Player player) {
         return this.lobbySet ? this.lobby : player.getWorld().getSpawnLocation();
     }
@@ -698,6 +752,15 @@ public class DuelManager {
     }
 
     public void cleanup() {
+        // Restore any pending states before clearing
+        for (Map.Entry<UUID, PlayerState> entry : this.pendingStatesManager.getAll().entrySet()) {
+            Player p = Bukkit.getPlayer(entry.getKey());
+            if (p != null && p.isOnline()) {
+                this.applyRestore(p, entry.getValue());
+            }
+        }
+        this.pendingStatesManager.clear();
+        
         for (UUID uid : this.inMatch) {
             Player p = Bukkit.getPlayer((UUID)uid);
             if (p == null) continue;
@@ -1009,8 +1072,5 @@ public class DuelManager {
 
     public boolean isArenaConfigured() {
         return this.pos1 != null && this.pos2 != null && this.lobby != null;
-    }
-
-    private record PlayerState(ItemStack[] inventory, ItemStack[] armor, Location location, GameMode gameMode, double health, int foodLevel, int level, float exp, float walkSpeed, float flySpeed, boolean allowFlight, boolean flying) {
     }
 }

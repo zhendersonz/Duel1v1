@@ -30,6 +30,7 @@ import org.bukkit.event.player.PlayerInteractAtEntityEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
@@ -134,6 +135,13 @@ implements Listener {
         this.duelManager.handleQuit(player);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerKick(PlayerKickEvent event) {
+        if (event.isCancelled()) return;
+        Player player = event.getPlayer();
+        this.duelManager.handleKickOrBan(player);
+    }
+
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         HumanEntity humanEntity = event.getPlayer();
@@ -212,6 +220,8 @@ implements Listener {
             if (this.duelManager.isInMatch(shooter)) {
                 if (!(entity instanceof Player) || !this.duelManager.isOpponent(shooter, (Player) entity)) {
                     event.setCancelled(true);
+                } else {
+                    event.setCancelled(false);
                 }
             }
             return;
@@ -229,6 +239,8 @@ implements Listener {
         if (damagedInMatch && damagerInMatch) {
             if (!this.duelManager.isOpponent(damager, damaged)) {
                 event.setCancelled(true);
+            } else {
+                event.setCancelled(false);
             }
         } else if (damagedInMatch || damagerInMatch) {
             event.setCancelled(true);

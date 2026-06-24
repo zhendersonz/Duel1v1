@@ -16,11 +16,14 @@ extends JavaPlugin {
     private DuelManager duelManager;
     private StatsManager statsManager;
     private HologramManager hologramManager;
+    private PendingStatesManager pendingStatesManager;
 
     public void onEnable() {
         this.saveDefaultConfig();
+        this.pendingStatesManager = new PendingStatesManager(this);
+        this.pendingStatesManager.load();
         this.statsManager = new StatsManager(this);
-        this.duelManager = new DuelManager(this, this.statsManager);
+        this.duelManager = new DuelManager(this, this.statsManager, this.pendingStatesManager);
         this.hologramManager = new HologramManager(this, this.statsManager);
         this.getCommand("duelo").setExecutor((CommandExecutor)new DuelCommand(this, this.duelManager, this.statsManager, this.hologramManager));
         this.getCommand("duelonpc").setExecutor((CommandExecutor)(sender, command, label, args) -> {
@@ -49,6 +52,9 @@ extends JavaPlugin {
     }
 
     public void onDisable() {
+        if (this.pendingStatesManager != null) {
+            this.pendingStatesManager.save();
+        }
         if (this.hologramManager != null) {
             this.hologramManager.remove();
         }
