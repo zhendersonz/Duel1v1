@@ -48,6 +48,9 @@ extends JavaPlugin {
             return true;
         });
         this.getServer().getPluginManager().registerEvents((Listener)new DuelListener(this, this.duelManager), (Plugin)this);
+        if (WorldGuardHook.isEnabled()) {
+            this.getServer().getPluginManager().registerEvents(WorldGuardHook.createPvPListener(this.duelManager), (Plugin)this);
+        }
         this.duelManager.loadNpc();
         this.hologramManager.load();
         this.getLogger().info("Duel1v1 ativado!");

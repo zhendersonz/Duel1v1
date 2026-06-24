@@ -573,6 +573,8 @@ public class DuelManager {
         p2.setFlySpeed(0.1f);
         p1.setFlying(false);
         p2.setFlying(false);
+        p1.setAllowFlight(false);
+        p2.setAllowFlight(false);
     }
 
     private void cancelActiveFreeze(Player player) {
@@ -584,6 +586,7 @@ public class DuelManager {
             player.setWalkSpeed(0.2f);
             player.setFlySpeed(0.1f);
             player.setFlying(false);
+            player.setAllowFlight(false);
         }
     }
 
@@ -699,7 +702,7 @@ public class DuelManager {
         player.setFlySpeed(0.1f);
         player.setGameMode(GameMode.SURVIVAL);
         player.setNoDamageTicks(0);
-        player.setAllowFlight(true);
+        player.setAllowFlight(false);
         player.setFlying(false);
         new ArrayList<>(player.getActivePotionEffects()).forEach(e -> player.removePotionEffect(e.getType()));
         player.getInventory().clear();
